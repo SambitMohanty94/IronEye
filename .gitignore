@@ -1,0 +1,22 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Secrets and environment variables
+.env
+
+# Large model weights (YOLO, checkpoints)
+*.pt
+*.onnx
+*.weights
+
+# System and editor clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
