@@ -7,6 +7,7 @@ import numpy as np
 
 from src.engine.video_source import VideoSource
 from src.engine.detector import YOLODetector
+from src.engine.risk_engine import RiskEngine
 
 
 class StreamManager:
@@ -19,6 +20,9 @@ class StreamManager:
         self.video_path = video_path
         self.video_source = VideoSource(self.video_path)
         self.detector: Optional[YOLODetector] = None
+        self.risk_engine = RiskEngine()
+        self.zone_polygon = None
+        self.latest_frame_risk = None
         
         self.is_running: bool = True
         self._lock = threading.Lock()
@@ -185,6 +189,28 @@ class StreamManager:
                     # Run YOLO inference & annotation
                     detector = self._get_detector()
                     annotated_frame, metadata = detector.detect_and_annotate(raw_frame)
+                                        # Evaluate fire/smoke detections against the configured safety zone.
+                    frame_risk = self.risk_engine.process_frame(
+                        detections=metadata.get("detections", []),
+                        polygon=self.zone_polygon,
+                        now=start_time,
+                    )
+                    self.latest_frame_risk = frame_risk
+
+                    risk_results = [
+                        {
+                            "class": r.detection_class,
+                            "confidence": r.confidence,
+                            "bbox": list(r.bbox) if r.bbox else [],
+                            "foot_point": r.foot_point,
+                            "inside_zone": r.inside_zone,
+                            "risk_level": r.risk_level,
+                            "confirmed": r.confirmed,
+                            "incident_eligible": r.incident_eligible,
+                        }
+                        for r in frame_risk.results
+                        if r.detection_class in {"fire", "smoke"}
+                    ]
 
                     # Update telemetry
                     self.detection_count = metadata["total_detections"]

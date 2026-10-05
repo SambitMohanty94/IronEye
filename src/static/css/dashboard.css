@@ -19,11 +19,12 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+
 }
 
 body {
   background-color: var(--bg-primary);
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 85% 85%, rgba(59, 130, 246, 0.05) 0%, transparent 40%),
     linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
@@ -189,9 +190,21 @@ body {
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.6; }
-  50% { transform: scale(1.25); opacity: 1; box-shadow: 0 0 12px var(--accent-emerald); }
-  100% { transform: scale(0.95); opacity: 0.6; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: scale(1.25);
+    opacity: 1;
+    box-shadow: 0 0 12px var(--accent-emerald);
+  }
+
+  100% {
+    transform: scale(0.95);
+    opacity: 0.6;
+  }
 }
 
 /* Video Stage */
@@ -215,6 +228,16 @@ body {
   display: block;
 }
 
+.zone-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 100;
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
 /* Scanline and Corner Accents */
 .viewport-overlay {
   position: absolute;
@@ -225,6 +248,10 @@ body {
   pointer-events: none;
   border: 1px solid rgba(0, 240, 255, 0.15);
   border-radius: 12px;
+}
+
+.viewport-overlay * {
+  pointer-events: none;
 }
 
 .corner-top-left {

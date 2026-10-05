@@ -66,8 +66,46 @@ def stop_monitoring():
 
 
 @router.get("/api/status")
+@router.get("/api/status")
 def get_status():
     """
     Get live stream status, detection metrics, and video source details.
     """
     return JSONResponse(stream_manager.get_status())
+
+
+@router.post("/api/set_zone")
+def set_zone(payload: dict):
+    """Set the safety-zone polygon used by the risk engine."""
+    points = payload.get("points", [])
+
+    if not isinstance(points, list) or len(points) < 3:
+        return JSONResponse(
+            {
+                "success": False,
+                "message": "A zone requires at least 3 points.",
+            },
+            status_code=400,
+        )
+
+    try:
+        polygon = [
+            (int(point["x"]), int(point["y"]))
+            for point in points
+        ]
+    except (KeyError, TypeError, ValueError):
+        return JSONResponse(
+            {
+                "success": False,
+                "message": "Each point must contain numeric x and y values.",
+            },
+            status_code=400,
+        )
+
+    stream_manager.zone_polygon = polygon
+
+    return JSONResponse({
+        "success": True,
+        "message": "Safety zone updated.",
+        "points": polygon,
+    })

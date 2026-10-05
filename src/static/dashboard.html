@@ -63,7 +63,15 @@
 
       <!-- Live MJPEG Stream Display -->
       <div class="video-wrapper">
-        <img id="videoFeed" class="video-frame" src="/video_feed" alt="IronEye Processed Video Feed">
+        <img id="videoFeed"
+             class="video-frame"
+             src="/video_feed"
+             alt="IronEye Processed Video Feed">
+
+        <svg id="zoneCanvas"
+             class="zone-canvas"
+             aria-label="Safety zone drawing area"></svg>
+
         <div class="viewport-overlay">
           <div class="corner-top-left"></div>
           <div class="corner-bottom-right"></div>
