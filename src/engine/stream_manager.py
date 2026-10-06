@@ -8,6 +8,7 @@ import numpy as np
 from src.engine.video_source import VideoSource
 from src.engine.detector import YOLODetector
 from src.engine.risk_engine import RiskEngine
+from src.database.incident_service import IncidentService
 
 
 class StreamManager:
@@ -21,9 +22,10 @@ class StreamManager:
         self.video_source = VideoSource(self.video_path)
         self.detector: Optional[YOLODetector] = None
         self.risk_engine = RiskEngine()
+        self.incident_service = IncidentService()
         self.zone_polygon = None
-        self.latest_frame_risk = None
-        
+        self.latest_frame_risk = None 
+ 
         self.is_running: bool = True
         self._lock = threading.Lock()
         
@@ -196,6 +198,12 @@ class StreamManager:
                         now=start_time,
                     )
                     self.latest_frame_risk = frame_risk
+                    for result in frame_risk.results:
+                        if result.incident_eligible and result.risk_level == "CRITICAL":
+                            self.incident_service.handle_critical_incident(
+                                frame=annotated_frame,
+                                risk_result=result,
+                            )
 
                     risk_results = [
                         {
