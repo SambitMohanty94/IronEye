@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>IronEye — Phone Camera</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0d12;
+      color: #e0e6f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    h1 {
+      color: #00f2fe;
+      font-size: 1.3rem;
+      margin-bottom: 4px;
+    }
+
+    .sub {
+      font-size: 0.8rem;
+      color: #7a8a9a;
+      margin-bottom: 16px;
+    }
+
+    video {
+      width: 100%;
+      max-width: 480px;
+      border-radius: 10px;
+      background: #111;
+      border: 1px solid #1e2a38;
+    }
+
+    canvas {
+      display: none;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      background: #1a2030;
+      color: #7a8a9a;
+    }
+
+    .status.ok {
+      background: #0d2e1a;
+      color: #00e676;
+    }
+
+    .status.err {
+      background: #2e0d0d;
+      color: #ff5252;
+    }
+
+    .btn {
+      margin-top: 14px;
+      padding: 14px 32px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      max-width: 480px;
+      transition: opacity 0.2s;
+    }
+
+    #btnStart {
+      background: #00c853;
+      color: #000;
+    }
+
+    #btnStop {
+      background: #ff5252;
+      color: #fff;
+      display: none;
+    }
+
+    .metrics {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: #556677;
+      text-align: center;
+    }
+
+    .tip {
+      margin-top: 20px;
+      max-width: 480px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #111922;
+      border-left: 3px solid #00a0cc;
+      font-size: 0.78rem;
+      color: #8899aa;
+      line-height: 1.6;
+    }
+
+    select {
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #1a2030;
+      border: 1px solid #2a3a50;
+      color: #e0e6f0;
+      font-size: 0.9rem;
+      width: 100%;
+      max-width: 480px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>📡 IronEye Phone Camera</h1>
+  <p class="sub">Stream your phone camera to the IronEye laptop server</p>
+
+  <select id="cameraSelect">
+    <option value="environment">Back Camera (Recommended)</option>
+    <option value="user">Front Camera</option>
+  </select>
+
+  <video id="localVideo" autoplay playsinline muted></video>
+  <canvas id="captureCanvas"></canvas>
+
+  <button class="btn" id="btnStart">▶ Start Streaming</button>
+  <button class="btn" id="btnStop">■ Stop Streaming</button>
+
+  <div class="status" id="statusEl">Not started</div>
+  <div class="metrics" id="metricsEl">Frames sent: 0 | Last latency: --</div>
+
+  <div class="tip">
+    <strong>Setup:</strong><br>
+    1. Both this phone and the laptop must be on the <strong>same Wi-Fi</strong>.<br>
+    2. Open this page from the laptop's IP address (e.g., <code>http://192.168.x.x:8000/phone</code>).<br>
+    3. Tap <strong>Start Streaming</strong> and grant camera permission.<br>
+    4. On the dashboard, click <strong>Switch to Phone Camera</strong>.<br><br>
+    <strong>HTTPS note:</strong> Chrome on Android requires HTTPS for camera access unless opened from
+    <code>localhost</code>.
+    Use a reverse proxy (ngrok, Caddy) for HTTPS, or test over USB with adb port forwarding.
+  </div>
+
+  <script>
+    const video = document.getElementById('localVideo');
+    const canvas = document.getElementById('captureCanvas');
+    const ctx = canvas.getContext('2d');
+    const btnStart = document.getElementById('btnStart');
+    const btnStop = document.getElementById('btnStop');
+    const statusEl = document.getElementById('statusEl');
+    const metricsEl = document.getElementById('metricsEl');
+    const cameraSelect = document.getElementById('cameraSelect');
+
+    let stream = null;
+    let sendInterval = null;
+    let framesSent = 0;
+    let cameraId = 'phone-' + Math.random().toString(36).slice(2, 7);
+    const TARGET_FPS = 10; // low to reduce CPU/bandwidth on CPU-only server
+
+    function setStatus(msg, cls = '') {
+      statusEl.textContent = msg;
+      statusEl.className = 'status ' + cls;
+    }
+
+    async function startStream() {
+      const facing = cameraSelect.value;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false
+        });
+        video.srcObject = stream;
+        btnStart.style.display = 'none';
+        btnStop.style.display = 'block';
+        setStatus('Streaming…', 'ok');
+
+        // Enable phone camera mode on server
+        await fetch('/api/phone_camera/enable', { method: 'POST' });
+
+        sendInterval = setInterval(sendFrame, 1000 / TARGET_FPS);
+      } catch (err) {
+        setStatus('Camera error: ' + err.message, 'err');
+        console.error(err);
+      }
+    }
+
+    let isSending = false;
+
+    async function sendFrame() {
+      if (!stream || isSending) return;
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) return;
+
+      isSending = true;
+      let targetW = vw;
+      let targetH = vh;
+      if (targetW > 640) {
+        targetH = Math.round((vh * 640) / targetW);
+        targetW = 640;
+      }
+
+      canvas.width = targetW;
+      canvas.height = targetH;
+      ctx.drawImage(video, 0, 0, targetW, targetH);
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) {
+          isSending = false;
+          return;
+        }
+        const t0 = performance.now();
+        try {
+          const res = await fetch('/api/phone_frame', {
+            method: 'POST',
+            headers: { 'Content-Type': 'image/jpeg', 'X-Camera-Id': cameraId },
+            body: blob
+          });
+          const lat = (performance.now() - t0).toFixed(0);
+          if (res.ok) {
+            framesSent++;
+            metricsEl.textContent = `Frames sent: ${framesSent} | Last latency: ${lat} ms`;
+            setStatus('Streaming — ' + new Date().toLocaleTimeString(), 'ok');
+          } else {
+            setStatus('Server error: ' + res.status, 'err');
+          }
+        } catch (e) {
+          setStatus('Network error', 'err');
+        } finally {
+          isSending = false;
+        }
+      }, 'image/jpeg', 0.65);
+    }
+
+    function stopStream() {
+      clearInterval(sendInterval);
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null;
+      video.srcObject = null;
+      btnStart.style.display = 'block';
+      btnStop.style.display = 'none';
+      fetch('/api/phone_camera/disable', { method: 'POST' });
+      setStatus('Stopped', '');
+      framesSent = 0;
+    }
+
+    btnStart.addEventListener('click', startStream);
+    btnStop.addEventListener('click', stopStream);
+  </script>
+</body>
+
+</html>

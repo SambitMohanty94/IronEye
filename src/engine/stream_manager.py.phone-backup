@@ -46,7 +46,7 @@ class StreamManager:
     def _get_detector(self) -> YOLODetector:
         """Lazy-load YOLO detector to optimize startup time."""
         if self.detector is None:
-            self.detector = YOLODetector(conf_threshold=0.35)
+            self.detector = YOLODetector(model_name="yolov8n.pt", conf_threshold=0.35)
         return self.detector
 
     def start(self):
@@ -202,13 +202,7 @@ class StreamManager:
                     else:
                         start_time = time.time()
                         detector = self._get_detector()
-                        
-                        try:
-                            annotated_frame, metadata = detector.detect_and_annotate(raw_frame)
-                        except Exception as e:
-                            logger.error("Phone detector inference failed: %s", e)
-                            annotated_frame = raw_frame.copy()
-                            metadata = {"detections": [], "total_detections": 0, "classes": {}}
+                        annotated_frame, metadata = detector.detect_and_annotate(raw_frame)
 
                         frame_risk = self.risk_engine.process_frame(
                             detections=metadata.get("detections", []),

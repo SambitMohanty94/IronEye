@@ -242,8 +242,37 @@
               <span class="detail-value" id="modelClasses" style="color:var(--text-muted); font-size:0.73rem;">—</span>
             </div>
             <div class="detail-row">
+              <span class="detail-label">PPE Model</span>
+              <span class="detail-value" id="ppeModelInfo" style="color:var(--accent-cyan); font-size:0.75rem;">Loading…</span>
+            </div>
+            <div class="detail-row">
               <span class="detail-label">Zone</span>
               <span class="detail-value" id="zoneStatus" style="color:var(--text-muted);">Not configured</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Detection Features</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary);">
+                <input type="checkbox" id="chkHelmet" onchange="toggleFeature('helmet', this.checked)">
+                Helmet Detection
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary);">
+                <input type="checkbox" id="chkPpe" onchange="toggleFeature('ppe', this.checked)">
+                PPE Detection
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary);">
+                <input type="checkbox" id="chkRestrictionZone" onchange="toggleFeature('restriction_zone', this.checked)">
+                Restriction Zone Alarm
+              </label>
+            </div>
+            <div id="workerStatesPanel" style="margin-top:12px; font-size:0.75rem; color:var(--text-primary); border-top:1px solid var(--border-dark); padding-top:8px;">
+              <div style="color:var(--text-dim); margin-bottom:4px;">Workers: <span id="wsTotal">0</span> | Helmet Viol: <span id="wsHelmet">0</span> | PPE Viol: <span id="wsPpe">0</span></div>
+              <div id="workerList" style="display:flex; flex-direction:column; gap:4px; max-height:100px; overflow-y:auto;">
+              </div>
             </div>
           </div>
 
@@ -544,6 +573,16 @@ How can I assist you today?
 
   document.addEventListener('click', initAudio, { once: false });
 
+  function toggleFeature(feature, enabled) {
+    fetch('/api/toggle_feature', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature, enabled })
+    })
+    .then(r => r.json())
+    .catch(err => console.error("Error toggling feature:", err));
+  }
+
   function startAlarmSound() {
     if (isAlarmPlaying || isAlarmSilenced) return;
     initAudio();
@@ -759,6 +798,31 @@ How can I assist you today?
     if ($('modelClasses') && data.model_classes) {
       const classVals = Object.values(data.model_classes);
       $('modelClasses').textContent = classVals.length ? classVals.join(', ') : '—';
+    }
+
+    if ($('ppeModelInfo')) {
+      const pmName = data.ppe_model || 'Not configured';
+      $('ppeModelInfo').textContent = pmName.split('/').pop().replace('.pt','');
+    }
+
+    if ($('chkHelmet') && data.helmet_detection_enabled !== undefined) $('chkHelmet').checked = data.helmet_detection_enabled;
+    if ($('chkPpe') && data.ppe_detection_enabled !== undefined) $('chkPpe').checked = data.ppe_detection_enabled;
+    if ($('chkRestrictionZone') && data.restriction_zone_enabled !== undefined) $('chkRestrictionZone').checked = data.restriction_zone_enabled;
+
+    if ($('wsTotal') && data.worker_states) {
+        const workers = data.worker_states;
+        $('wsTotal').textContent = workers.length;
+        $('wsHelmet').textContent = workers.filter(w => w.helmet === 'VIOLATION').length;
+        $('wsPpe').textContent = workers.filter(w => w.vest === 'VIOLATION').length;
+        
+        if ($('workerList')) {
+            $('workerList').innerHTML = workers.map(w => 
+                `<div style="display:flex; justify-content:space-between; background:var(--bg-lighter); padding:2px 4px; border-radius:4px;">
+                    <span>Worker ${w.id}</span>
+                    <span>Helmet: <span style="color:${w.helmet==='SAFE'?'var(--accent-emerald)':'var(--accent-rose)'}">${w.helmet}</span> | Vest: <span style="color:${w.vest==='SAFE'?'var(--accent-emerald)':'var(--accent-rose)'}">${w.vest}</span></span>
+                </div>`
+            ).join('');
+        }
     }
 
     if ($('modelBadge') && data.model) {
@@ -1078,6 +1142,7 @@ How can I assist you today?
       const cp = $('zoneControlsPanel');
       btnDrawZone.textContent = on ? '⏸ Stop Drawing' : '✏ Draw Zone';
       zoneCanvas.style.cursor = on ? 'crosshair' : '';
+      zoneCanvas.style.pointerEvents = on ? 'all' : 'none';
       if (hint) hint.style.display = on ? 'block' : 'none';
       if (cp) cp.style.display = on ? 'flex' : 'none';
     }

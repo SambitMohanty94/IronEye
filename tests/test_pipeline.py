@@ -36,6 +36,25 @@ def test_status_endpoint():
     assert "detection_count" in data
 
 
+def test_chatbot_endpoint():
+    """Verify POST /api/chatbot returns local safety guidance."""
+    client = TestClient(main.app)
+    response = client.post("/api/chatbot", json={"message": "What PPE is required?"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "reply" in data
+    assert "PPE" in data["reply"] or "Hard hat" in data["reply"]
+
+
+def test_incidents_export_csv_endpoint():
+    """Verify GET /api/incidents/export returns a valid CSV file download."""
+    client = TestClient(main.app)
+    response = client.get("/api/incidents/export")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "Timestamp,Type,Risk Level" in response.text
+
+
 def test_yolo_detector_inference():
     """Verify YOLOv8n detector executes without error on a blank frame."""
     detector = YOLODetector()

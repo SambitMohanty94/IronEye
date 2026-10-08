@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Optional
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class AlertEngine:
@@ -44,6 +47,27 @@ class AlertEngine:
         """
 
         if not self.enabled:
+            missing = []
+            if not os.getenv("TWILIO_ACCOUNT_SID"):
+                missing.append("TWILIO_ACCOUNT_SID")
+            if not os.getenv("TWILIO_AUTH_TOKEN"):
+                missing.append("TWILIO_AUTH_TOKEN")
+            if not self.from_number:
+                missing.append("TWILIO_FROM_NUMBER")
+            if not self.to_number:
+                missing.append("TWILIO_TO_NUMBER")
+
+            if missing:
+                logger.info(
+                    "Twilio SMS not configured; missing environment variables: %s. Skipping alert for incident_type=%s.",
+                    ", ".join(missing),
+                    incident_type,
+                )
+            else:
+                logger.info(
+                    "Twilio client not initialized; skipping alert for incident_type=%s.",
+                    incident_type,
+                )
             return False
 
         message = (
@@ -52,12 +76,28 @@ class AlertEngine:
         )
 
         try:
-            self.client.messages.create(
+            result = self.client.messages.create(
                 body=message,
                 from_=self.from_number,
                 to=self.to_number,
             )
-            return True
+            sid = getattr(result, "sid", None)
+            if sid or result is not None:
+                logger.info(
+                    "SMS alert sent successfully for incident_type=%s.",
+                    incident_type,
+                )
+                return True
+            logger.warning(
+                "Twilio SMS create call returned invalid response for incident_type=%s.",
+                incident_type,
+            )
+            return False
         except Exception:
             # Alerting must never crash the video-processing loop.
+            # Log without credentials — only incident context.
+            logger.warning(
+                "Twilio SMS failed for incident_type=%s (credentials not logged).",
+                incident_type,
+            )
             return False

@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from src.api.routes import router as api_router
-
+from src.api.phone_live import router as phone_live_router
 app = FastAPI(title="IronEye Safety Platform")
 
 # Base paths

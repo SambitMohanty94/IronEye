@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 class IncidentWriter:
@@ -39,6 +42,7 @@ class IncidentWriter:
         """
 
         if not self.enabled:
+            logger.debug("Supabase not configured; skipping incident persistence.")
             return None
 
         try:
@@ -54,8 +58,18 @@ class IncidentWriter:
             if isinstance(data, list) and data:
                 return data[0]
 
+            # Insert may have been blocked by RLS or returned no rows.
+            logger.warning(
+                "Supabase insert returned no rows for incident_type=%s. "
+                "Check table permissions and RLS policies.",
+                incident.get("incident_type"),
+            )
             return None
 
         except Exception:
             # Persistence must never crash the video-processing loop.
+            logger.exception(
+                "Failed to persist incident to Supabase (incident_type=%s).",
+                incident.get("incident_type"),
+            )
             return None
