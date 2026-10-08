@@ -1,172 +1,1147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IronEye AI Safety Platform - Real-time Vision Monitor</title>
-  
-  <!-- Fonts -->
+  <title>IronEye Workplace Safety & Incident Management Platform</title>
+  <meta name="description" content="IronEye real-time AI workplace safety monitoring platform with fire detection, hazard reporting, and safety assistant.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  
-  <!-- Styles -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/dashboard.css">
+  <style>
+    /* Inline utility enhancements */
+    .incidents-panel { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; }
+    .incident-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: rgba(0,0,0,0.04); border: 1px solid var(--border-color); font-size: 0.8rem; }
+    .incident-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+    .badge-fire { background: rgba(239,68,68,0.2); color: var(--accent-rose); border: 1px solid rgba(239,68,68,0.4); }
+    .badge-smoke { background: rgba(148,163,184,0.2); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.3); }
+    .badge-critical { background: rgba(239,68,68,0.25); color: var(--accent-rose); border: 1px solid rgba(239,68,68,0.5); }
+    .incident-time { color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; margin-left: auto; white-space: nowrap; }
+    .alert-flash { display: none; position: fixed; top: 65px; right: 20px; z-index: 9999; background: var(--accent-rose); color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 700; font-size: 0.95rem; box-shadow: 0 4px 20px rgba(239,68,68,0.4); }
+    .risk-gauge { display: flex; gap: 6px; margin-top: 8px; }
+    .risk-level-pill { flex: 1; text-align: center; padding: 6px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-dim); }
+    .risk-level-pill.active-low { background: rgba(16,185,129,0.15); color: var(--accent-emerald); border-color: rgba(16,185,129,0.4); }
+    .risk-level-pill.active-high { background: rgba(245,158,11,0.15); color: var(--accent-amber); border-color: rgba(245,158,11,0.4); }
+    .risk-level-pill.active-critical { background: rgba(239,68,68,0.2); color: var(--accent-rose); border-color: rgba(239,68,68,0.5); }
+    .phone-section { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-top: 10px; }
+    .phone-section h4 { color: var(--accent-blue); font-size: 0.85rem; margin-bottom: 6px; }
+    .phone-url-box { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--accent-blue); word-break: break-all; }
+    .ip-note { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; }
+    #zoneDrawingHint { display: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: var(--accent-amber); color: #000; padding: 6px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; pointer-events: none; z-index: 10; white-space: nowrap; }
+    .chip-btn { padding: 4px 10px; border-radius: 16px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-muted); font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
+    .chip-btn:hover { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+  </style>
 </head>
 <body>
+
+  <!-- Alert flash overlay -->
+  <div class="alert-flash" id="alertFlash">
+    <span id="alertFlashText">🔥 CRITICAL ALERT DETECTED</span>
+    <button id="btnSilenceOverlay" style="margin-left:14px; padding:4px 12px; background:#fff; color:#dc2626; border:none; border-radius:4px; font-weight:700; cursor:pointer;">🔕 Silence Alarm</button>
+  </div>
 
   <!-- Top Navigation Header -->
   <header class="header">
     <div class="brand-container">
       <div class="brand-logo">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-        </svg>
+        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
       </div>
       <div>
         <h1 class="brand-title">IRONEYE</h1>
       </div>
-      <span class="brand-badge">CV Engine v1.0</span>
+      <span class="brand-badge" id="modelBadge">Fire Model</span>
     </div>
 
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-overview">Overview</button>
+      <button class="nav-tab" data-tab="tab-live">Live Monitoring</button>
+      <button class="nav-tab" data-tab="tab-incidents">Incident Records</button>
+      <button class="nav-tab" data-tab="tab-reports">Safety Reports</button>
+      <button class="nav-tab" data-tab="tab-company">Company</button>
+      <button class="nav-tab" data-tab="tab-assistant">Safety Assistant</button>
+      <button class="nav-tab" data-tab="tab-settings">Settings</button>
+      <button class="nav-tab" data-tab="tab-profile">User Profile</button>
+    </nav>
+
     <div class="header-status">
+      <button class="theme-toggle-btn" id="btnThemeToggle">🌓 Theme</button>
+      <div id="riskLevelHeader" style="font-size:0.8rem; font-weight:700; color:var(--text-muted);">RISK: —</div>
       <div class="system-clock" id="sysClock">--:--:-- UTC</div>
     </div>
   </header>
 
-  <!-- Main Dashboard Layout -->
+  <!-- Main Content Container -->
   <main class="dashboard-container">
-    
-    <!-- Left Column: Video Viewport & Controls -->
-    <section class="viewport-card">
-      
-      <!-- Video Missing Alert -->
-      <div class="alert-banner alert-warning" id="alertMissingVideo">
-        <svg class="alert-icon" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-        </svg>
-        <div>
-          <strong>Missing Video Source:</strong> Please place your MP4 video file at 
-          <code>videos/test.mp4</code>. The engine will automatically detect and start looping the video.
+
+    <!-- TAB 1: OVERVIEW -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="overview-grid">
+        <div class="card">
+          <div class="card-title">Monitoring Status</div>
+          <div class="metric-large" id="ovStatus">MONITORING</div>
+          <div class="metric-subtitle">Active Optical Feed</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Active Hazard Level</div>
+          <div class="metric-large" id="ovRisk" style="color:var(--accent-emerald);">LOW</div>
+          <div class="metric-subtitle">Temporal Safety Verification</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Total Incidents Recorded</div>
+          <div class="metric-large" id="ovIncCount">0</div>
+          <div class="metric-subtitle">In-Memory Audit Buffer</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Processing Speed</div>
+          <div class="metric-large" id="ovFps">-- FPS</div>
+          <div class="metric-subtitle">Normalized 640x480 Pipeline</div>
         </div>
       </div>
 
-      <div class="viewport-header">
-        <div class="viewport-title">
-          <span>Primary Optical Feed</span>
-        </div>
-        <div class="live-indicator">
-          <span class="pulse-dot" id="pulseDot"></span>
-          <span id="liveIndicatorText">LIVE FEED</span>
-        </div>
-      </div>
-
-      <!-- Live MJPEG Stream Display -->
-      <div class="video-wrapper">
-        <img id="videoFeed"
-             class="video-frame"
-             src="/video_feed"
-             alt="IronEye Processed Video Feed">
-
-        <svg id="zoneCanvas"
-             class="zone-canvas"
-             aria-label="Safety zone drawing area"></svg>
-
-        <div class="viewport-overlay">
-          <div class="corner-top-left"></div>
-          <div class="corner-bottom-right"></div>
-        </div>
-      </div>
-
-      <!-- Action Controls -->
-      <div class="controls-bar">
-        <button id="btnStart" class="btn btn-primary" title="Start real-time monitoring">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z"/>
-          </svg>
-          Start Monitoring
-        </button>
-
-        <button id="btnStop" class="btn btn-stop" title="Pause real-time monitoring">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-          </svg>
-          Stop Monitoring
-        </button>
-
-        <button id="btnRefresh" class="btn btn-refresh" title="Reconnect video stream">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
-          </svg>
-          Refresh Feed
-        </button>
-      </div>
-
-    </section>
-
-    <!-- Right Column: Telemetry & Status HUD -->
-    <aside class="sidebar">
-
-      <!-- Real-time Detections Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Live Detections</span>
-          <span class="brand-badge" id="fpsVal">-- FPS</span>
-        </div>
-        <div class="metric-large" id="detectionCount">0</div>
-        <div class="metric-subtitle">Objects detected in current video frame</div>
-      </div>
-
-      <!-- System & Feed Status Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Feed Telemetry</span>
-        </div>
-        
-        <div class="detail-row">
-          <span class="detail-label">Camera / Video Status</span>
-          <span id="statusBadge" class="status-badge status-active">MONITORING</span>
+      <div class="live-grid">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Executive Hazard Summary</span>
+            <button class="btn btn-primary" onclick="switchTab('tab-live')">▶ Open Live Viewport</button>
+          </div>
+          <div style="font-size:0.88rem; line-height:1.6; color:var(--text-muted);">
+            IronEye continuous AI monitoring is active. The spatial risk engine enforces a 10-frame consecutive verification window (~330ms) for fire and smoke plumes before escalating hazard status to CRITICAL.
+          </div>
+          <div style="margin-top:1.25rem; display:flex; gap:12px;">
+            <div class="card" style="flex:1; background:var(--bg-primary);">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">FIRE DETECTION</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--text-main); margin-top:4px;" id="ovFireFrames">0 / 10 Frames</div>
+            </div>
+            <div class="card" style="flex:1; background:var(--bg-primary);">
+              <div style="font-size:0.75rem; color:var(--text-dim); font-weight:700;">SMOKE DETECTION</div>
+              <div style="font-size:1.2rem; font-weight:700; color:var(--text-main); margin-top:4px;" id="ovSmokeFrames">0 / 10 Frames</div>
+            </div>
+          </div>
         </div>
 
-        <div class="detail-row">
-          <span class="detail-label">Current Video Source</span>
-          <span id="videoSourceText" class="detail-value">test.mp4</span>
-        </div>
-
-        <div class="detail-row">
-          <span class="detail-label">Inference Model</span>
-          <span class="detail-value" style="color: var(--accent-cyan);">YOLOv8n (Pretrained)</span>
-        </div>
-
-        <div class="detail-row">
-          <span class="detail-label">Stream Format</span>
-          <span class="detail-value">multipart/x-mixed-replace</span>
-        </div>
-
-        <div class="detail-row">
-          <span class="detail-label">Pipeline</span>
-          <span class="detail-value">MP4 → OpenCV → YOLO</span>
-        </div>
-      </div>
-
-      <!-- Detected Classes Breakdown Card -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Detected Classes</span>
-        </div>
-        
-        <div class="detections-list" id="detectedClassesList">
-          <div class="detection-pill" style="opacity: 0.5;">
-            <span>Awaiting inference...</span>
-            <span class="detection-pill-count">0</span>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Recent Activity</span>
+            <span class="brand-badge" id="ovRecBadge">0 Events</span>
+          </div>
+          <div class="incidents-panel" id="ovRecentList">
+            <div style="color:var(--text-dim); font-size:0.8rem; text-align:center; padding:16px 0;">No recent hazards logged</div>
           </div>
         </div>
       </div>
+    </div>
 
-    </aside>
+    <!-- TAB 2: LIVE MONITORING -->
+    <div id="tab-live" class="tab-content">
+      <div class="live-grid">
+        <section class="viewport-card">
+          <div class="alert-banner alert-warning" id="alertMissingVideo">
+            <svg class="alert-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+            <div><strong>Missing Video Source:</strong> Place test video at <code>videos/test.mp4</code> or use Phone Camera.</div>
+          </div>
+
+          <div class="viewport-header">
+            <div class="viewport-title"><span id="sourceLabel">Primary Optical Feed</span></div>
+            <div class="live-indicator">
+              <span class="pulse-dot" id="pulseDot"></span>
+              <span id="liveIndicatorText">LIVE FEED</span>
+            </div>
+          </div>
+
+          <div class="video-wrapper">
+            <img id="videoFeed" class="video-frame" src="/video_feed" alt="IronEye Video Feed">
+            <svg id="zoneCanvas" class="zone-canvas" aria-label="Safety zone drawing area"></svg>
+            <div id="zoneDrawingHint">🖱 Click to add points · Double-click to save</div>
+          </div>
+
+          <div class="controls-bar">
+            <button id="btnStart" class="btn btn-primary" title="Start real-time monitoring">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Start Monitoring
+            </button>
+            <button id="btnStop" class="btn btn-stop" title="Pause real-time monitoring">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+              Stop
+            </button>
+            <button id="btnRefresh" class="btn btn-refresh" title="Reconnect video stream">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              Refresh
+            </button>
+            <button id="btnSilenceAlarm" class="btn btn-stop" title="Silence active alarm" style="display:none;">
+              🔕 Silence Alarm
+            </button>
+            <button id="btnDrawZone" class="btn btn-refresh" title="Draw safety zone on video">
+              ✏ Draw Zone
+            </button>
+            <button id="btnClearZone" class="btn btn-stop" title="Clear safety zone" style="display:none;">
+              ✕ Clear Zone
+            </button>
+          </div>
+
+          <div class="zone-controls" id="zoneControlsPanel" style="display:none;">
+            <span style="font-size:0.78rem; color:var(--text-muted);">
+              📐 Click on the video feed to add polygon vertices. Double-click the final point to close and save safety boundary.
+            </span>
+          </div>
+
+          <div class="phone-section">
+            <h4>📱 Phone Camera Ingestion (Android / Web browser)</h4>
+            <div class="phone-url-box" id="phoneUrl">Open this URL on mobile: <span id="phoneUrlText">loading…</span></div>
+            <div class="ip-note">Both devices must share the same network. HTTPS required in Chrome on Android.</div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button id="btnEnablePhone" class="btn btn-primary" style="flex:1; font-size:0.8rem;">Switch to Phone Camera</button>
+              <button id="btnDisablePhone" class="btn btn-stop" style="flex:1; font-size:0.8rem; display:none;">Switch to Video File</button>
+            </div>
+          </div>
+        </section>
+
+        <aside class="sidebar">
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Risk Level</span>
+              <span class="brand-badge" id="fpsVal">-- FPS</span>
+            </div>
+            <div class="risk-gauge">
+              <div class="risk-level-pill" id="pillLow">LOW</div>
+              <div class="risk-level-pill" id="pillHigh">HIGH</div>
+              <div class="risk-level-pill" id="pillCritical">CRITICAL</div>
+            </div>
+            <div style="margin-top:10px;">
+              <div class="detail-row">
+                <span class="detail-label">🔥 Fire frames</span>
+                <span class="detail-value" id="fireFrames">0 / 10</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">💨 Smoke frames</span>
+                <span class="detail-value" id="smokeFrames">0 / 10</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Objects in frame</span>
+                <span class="detail-value metric-large" id="detectionCount" style="font-size:1.3rem;">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Feed Status</span>
+              <span id="statusBadge" class="status-badge status-active">MONITORING</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Source</span>
+              <span id="videoSourceText" class="detail-value">test.mp4</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Model</span>
+              <span class="detail-value" id="modelInfo" style="color:var(--accent-cyan); font-size:0.75rem;">Loading…</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Classes</span>
+              <span class="detail-value" id="modelClasses" style="color:var(--text-muted); font-size:0.73rem;">—</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Zone</span>
+              <span class="detail-value" id="zoneStatus" style="color:var(--text-muted);">Not configured</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Live Detections</span>
+            </div>
+            <div class="detections-list" id="detectedClassesList">
+              <div class="detection-pill" style="opacity: 0.5;">
+                <span>Awaiting inference…</span>
+                <span class="detection-pill-count">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">Recent Incidents</span>
+              <span class="brand-badge" id="incidentCount">0</span>
+            </div>
+            <div class="incidents-panel" id="incidentsPanel">
+              <div style="color:var(--text-dim); font-size:0.78rem; text-align:center; padding:12px 0;">No incidents yet</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- TAB 3: INCIDENT RECORDS -->
+    <div id="tab-incidents" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Workplace Incident Audit Trail</span>
+          <button class="btn btn-primary" id="btnExportCsv">📥 Export CSV</button>
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:1rem;">
+          <input type="text" id="incSearch" class="form-input" placeholder="Search incidents..." style="max-width:240px;">
+          <select id="incFilterSev" class="form-select" style="max-width:160px;">
+            <option value="ALL">All Severities</option>
+            <option value="CRITICAL">Critical Only</option>
+            <option value="HIGH">High Only</option>
+            <option value="LOW">Low Only</option>
+          </select>
+          <select id="incFilterType" class="form-select" style="max-width:160px;">
+            <option value="ALL">All Hazard Types</option>
+            <option value="fire">Fire</option>
+            <option value="smoke">Smoke</option>
+            <option value="intrusion">Safety Zone Intrusion</option>
+          </select>
+        </div>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Hazard Type</th>
+                <th>Severity</th>
+                <th>Confidence</th>
+                <th>Evidence File</th>
+                <th>Alert Dispatched</th>
+                <th>Zone Status</th>
+              </tr>
+            </thead>
+            <tbody id="incTableBody">
+              <tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No incidents recorded</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: SAFETY REPORTS -->
+    <div id="tab-reports" class="tab-content">
+      <div class="overview-grid">
+        <div class="card">
+          <div class="card-title">Total Incidents</div>
+          <div class="metric-large" id="repTotal">0</div>
+          <div class="metric-subtitle">Audit Record Total</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Critical Fire Events</div>
+          <div class="metric-large" id="repFire" style="color:var(--accent-rose);">0</div>
+          <div class="metric-subtitle">Verified Fire Plumes</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Smoke Hazards</div>
+          <div class="metric-large" id="repSmoke" style="color:var(--accent-amber);">0</div>
+          <div class="metric-subtitle">Verified Smoke Columns</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Resolution Ratio</div>
+          <div class="metric-large" id="repResRatio" style="color:var(--accent-emerald);">100%</div>
+          <div class="metric-subtitle">Acknowledged & Mitigated</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Hazard Severity Distribution</span>
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-muted); line-height:1.6;" id="repSummaryText">
+          Loading report calculations from persistent database buffer…
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: COMPANY -->
+    <div id="tab-company" class="tab-content">
+      <div class="card" style="margin-bottom:1.25rem;">
+        <div class="card-header">
+          <span class="card-title">Site & Facility Safety Information</span>
+        </div>
+        <div class="detail-row"><span class="detail-label">Facility Name</span><span class="detail-value">IronEye Industrial Plant Facility #1</span></div>
+        <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">Zone 4 — Processing Sector</span></div>
+        <div class="detail-row"><span class="detail-label">Primary Safety Officer</span><span class="detail-value">Sambit Mohanty</span></div>
+        <div class="detail-row"><span class="detail-label">Emergency Line</span><span class="detail-value">+1 (555) 019-2831</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Fire Suppression & Safety Equipment Inventory</span>
+        </div>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Equipment ID</th>
+                <th>Type</th>
+                <th>Location</th>
+                <th>Last Inspected</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>EXT-01</td><td>CO2 Extinguisher (10 lbs)</td><td>Main Control Room</td><td>2026-09-15</td><td><span class="badge badge-safe">READY</span></td></tr>
+              <tr><td>EXT-02</td><td>Dry Chemical (20 lbs)</td><td>North Machine Bay</td><td>2026-09-20</td><td><span class="badge badge-safe">READY</span></td></tr>
+              <tr><td>ALM-01</td><td>Optical Smoke Sensor</td><td>Zone 4 Ceiling</td><td>2026-10-01</td><td><span class="badge badge-safe">ONLINE</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: SAFETY ASSISTANT CHATBOT -->
+    <div id="tab-assistant" class="tab-content">
+      <div class="chat-container">
+        <div class="chat-header">
+          <div style="font-weight:700; font-size:0.9rem; color:var(--text-main);">🤖 IronEye Safety Assistant</div>
+          <div style="font-size:0.75rem; color:var(--text-dim);">Local Knowledge & Live Telemetry Engine</div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+          <div class="chat-bubble bot">
+Hello! I am the **IronEye Safety Assistant**. I can help you with:
+• Workplace PPE standards & requirements
+• Fire & smoke evacuation protocols
+• Safety zone & temporal confirmation thresholds
+• Live stream risk status and telemetry queries
+
+How can I assist you today?
+          </div>
+        </div>
+
+        <div style="padding:6px 12px; background:var(--bg-primary); display:flex; gap:6px; overflow-x:auto;">
+          <button class="chip-btn" onclick="sendQuickChat('What are the required PPE standards?')">🛈 PPE Standards</button>
+          <button class="chip-btn" onclick="sendQuickChat('What is the current risk status?')">📡 Live Telemetry</button>
+          <button class="chip-btn" onclick="sendQuickChat('How do I handle a fire emergency?')">🔥 Fire Protocol</button>
+          <button class="chip-btn" onclick="sendQuickChat('How does the safety zone work?')">📐 Safety Zone</button>
+        </div>
+
+        <form class="chat-input-bar" id="chatForm">
+          <input type="text" id="chatInput" class="form-input" placeholder="Ask a safety or system question..." autocomplete="off">
+          <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 7: SETTINGS -->
+    <div id="tab-settings" class="tab-content">
+      <div class="card" style="max-width:640px;">
+        <div class="card-header">
+          <span class="card-title">Platform & Alarm Preferences</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Theme Mode</label>
+          <select id="setTheme" class="form-select">
+            <option value="dark">Dark Theme (Enterprise Slate)</option>
+            <option value="light">Light Theme (Neutral Clean)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Default Video Source</label>
+          <select id="setSource" class="form-select">
+            <option value="video_file">Video File (videos/test.mp4)</option>
+            <option value="phone_camera">Phone Camera</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Audible Fire Siren Volume</label>
+          <input type="range" id="setVolume" min="0" max="100" value="75" style="width:100%;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Fire Confirmation Threshold</label>
+          <select id="setConf" class="form-select">
+            <option value="10">10 Consecutive Frames (~330ms) [Default]</option>
+            <option value="15">15 Consecutive Frames (~500ms)</option>
+          </select>
+        </div>
+
+        <button class="btn btn-primary" id="btnSaveSettings">Save Preferences</button>
+      </div>
+    </div>
+
+    <!-- TAB 8: USER PROFILE -->
+    <div id="tab-profile" class="tab-content">
+      <div class="card" style="max-width:640px;">
+        <div class="card-header">
+          <span class="card-title">User & Authenticated Profile</span>
+        </div>
+
+        <form id="profileForm">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" id="profName" class="form-input" value="Sambit Mohanty">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role / Position</label>
+            <input type="text" id="profRole" class="form-input" value="Lead Safety Engineer">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Department</label>
+            <input type="text" id="profDept" class="form-input" value="Industrial Safety & Compliance">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="profEmail" class="form-input" value="safety.officer@ironeye.internal">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emergency Phone</label>
+            <input type="text" id="profPhone" class="form-input" value="+1 (555) 019-2831">
+          </div>
+          <button type="submit" class="btn btn-primary">Save Profile</button>
+        </form>
+      </div>
+    </div>
 
   </main>
 
-  <script src="/static/js/dashboard.js"></script>
+  <script>
+  // ==========================================
+  // IronEye Platform JavaScript Controller
+  // ==========================================
+
+  let lastIncidentCount = 0;
+  let alertFlashTimeout = null;
+  let drawingMode = false;
+  let zoneConfigured = false;
+  let allIncidents = [];
+
+  // DOM refs
+  const $ = id => document.getElementById(id);
+  const videoFeed = $('videoFeed');
+  const btnStart = $('btnStart');
+  const btnStop = $('btnStop');
+  const btnRefresh = $('btnRefresh');
+  const btnDrawZone = $('btnDrawZone');
+  const btnClearZone = $('btnClearZone');
+  const btnEnablePhone = $('btnEnablePhone');
+  const btnDisablePhone = $('btnDisablePhone');
+  const btnSilenceAlarm = $('btnSilenceAlarm');
+  const btnSilenceOverlay = $('btnSilenceOverlay');
+  const sysClock = $('sysClock');
+  const alertFlash = $('alertFlash');
+
+  // Web Audio API Fire Alarm Synthesizer
+  let audioCtx = null;
+  let alarmOsc = null;
+  let alarmGain = null;
+  let alarmSirenInterval = null;
+  let isAlarmPlaying = false;
+  let isAlarmSilenced = false;
+
+  function initAudio() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) audioCtx = new AudioContextClass();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  document.addEventListener('click', initAudio, { once: false });
+
+  function startAlarmSound() {
+    if (isAlarmPlaying || isAlarmSilenced) return;
+    initAudio();
+    if (!audioCtx) return;
+
+    try {
+      alarmOsc = audioCtx.createOscillator();
+      alarmGain = audioCtx.createGain();
+
+      alarmOsc.type = 'sawtooth';
+      alarmOsc.frequency.setValueAtTime(880, audioCtx.currentTime);
+
+      let toggle = false;
+      alarmSirenInterval = setInterval(() => {
+        if (!isAlarmPlaying || !alarmOsc || !audioCtx) {
+          clearInterval(alarmSirenInterval);
+          return;
+        }
+        try {
+          alarmOsc.frequency.setValueAtTime(toggle ? 880 : 550, audioCtx.currentTime);
+          toggle = !toggle;
+        } catch (e) {}
+      }, 300);
+
+      alarmGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+
+      alarmOsc.connect(alarmGain);
+      alarmGain.connect(audioCtx.destination);
+
+      alarmOsc.start();
+      isAlarmPlaying = true;
+      if (btnSilenceAlarm) btnSilenceAlarm.style.display = 'inline-flex';
+    } catch (e) {
+      console.error('Failed to play alarm audio:', e);
+    }
+  }
+
+  function stopAlarmSound() {
+    if (alarmSirenInterval) {
+      clearInterval(alarmSirenInterval);
+      alarmSirenInterval = null;
+    }
+    if (alarmOsc) {
+      try {
+        alarmOsc.stop();
+        alarmOsc.disconnect();
+      } catch (e) {}
+      alarmOsc = null;
+    }
+    alarmGain = null;
+    isAlarmPlaying = false;
+    if (btnSilenceAlarm) btnSilenceAlarm.style.display = 'none';
+  }
+
+  function silenceAlarm() {
+    isAlarmSilenced = true;
+    stopAlarmSound();
+    if (alertFlash) alertFlash.style.display = 'none';
+  }
+
+  if (btnSilenceOverlay) btnSilenceOverlay.addEventListener('click', silenceAlarm);
+  if (btnSilenceAlarm) btnSilenceAlarm.addEventListener('click', silenceAlarm);
+
+  // Theme Management
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('ironeye_theme', theme);
+    if ($('setTheme')) $('setTheme').value = theme;
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    setTheme(current === 'dark' ? 'light' : 'dark');
+  }
+
+  const savedTheme = localStorage.getItem('ironeye_theme') || 'dark';
+  setTheme(savedTheme);
+  if ($('btnThemeToggle')) $('btnThemeToggle').addEventListener('click', toggleTheme);
+  if ($('setTheme')) $('setTheme').addEventListener('change', e => setTheme(e.target.value));
+
+  // Tab Navigation
+  function switchTab(tabId) {
+    document.querySelectorAll('.nav-tab').forEach(t => {
+      t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => {
+      c.classList.toggle('active', c.id === tabId);
+    });
+  }
+
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchTab(tab.getAttribute('data-tab')));
+  });
+
+  // Clock
+  function updateClock() {
+    if (!sysClock) return;
+    const now = new Date();
+    const h = String(now.getUTCHours()).padStart(2,'0');
+    const m = String(now.getUTCMinutes()).padStart(2,'0');
+    const s = String(now.getUTCSeconds()).padStart(2,'0');
+    sysClock.textContent = `${h}:${m}:${s} UTC`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Phone URL
+  function setPhoneUrl() {
+    const el = $('phoneUrlText');
+    if (el) {
+      el.textContent = `${location.protocol}//${location.hostname}:${location.port || 80}/phone`;
+    }
+  }
+  setPhoneUrl();
+
+  function reloadStream() {
+    if (videoFeed) videoFeed.src = '/video_feed?t=' + Date.now();
+  }
+
+  // Telemetry Updates
+  function updateRisk(riskData) {
+    if (!riskData) return;
+    const overall = riskData.overall_risk || 'LOW';
+    const fireF = riskData.fire_consecutive_frames || 0;
+    const smokeF = riskData.smoke_consecutive_frames || 0;
+
+    if ($('fireFrames')) $('fireFrames').textContent = `${fireF} / 10`;
+    if ($('smokeFrames')) $('smokeFrames').textContent = `${smokeF} / 10`;
+    if ($('ovFireFrames')) $('ovFireFrames').textContent = `${fireF} / 10 Frames`;
+    if ($('ovSmokeFrames')) $('ovSmokeFrames').textContent = `${smokeF} / 10 Frames`;
+
+    const colors = { LOW: 'var(--accent-emerald)', HIGH: 'var(--accent-amber)', CRITICAL: 'var(--accent-rose)' };
+    const rh = $('riskLevelHeader');
+    if (rh) { rh.textContent = `RISK: ${overall}`; rh.style.color = colors[overall] || 'var(--text-muted)'; }
+    if ($('ovRisk')) { $('ovRisk').textContent = overall; $('ovRisk').style.color = colors[overall]; }
+
+    ['pillLow','pillHigh','pillCritical'].forEach(id => {
+      const el = $(id);
+      if (el) el.className = 'risk-level-pill';
+    });
+    const map = { LOW: 'pillLow', HIGH: 'pillHigh', CRITICAL: 'pillCritical' };
+    const classMap = { LOW: 'active-low', HIGH: 'active-high', CRITICAL: 'active-critical' };
+    if (map[overall] && $(map[overall])) $(map[overall]).classList.add(classMap[overall]);
+
+    if (overall === 'CRITICAL') {
+      showAlertFlash();
+      if (!isAlarmSilenced) startAlarmSound();
+    } else {
+      stopAlarmSound();
+      isAlarmSilenced = false;
+    }
+  }
+
+  function showAlertFlash() {
+    alertFlash.style.display = 'block';
+    clearTimeout(alertFlashTimeout);
+    alertFlashTimeout = setTimeout(() => { alertFlash.style.display = 'none'; }, 4000);
+  }
+
+  async function fetchStatus() {
+    try {
+      const [statusRes, riskRes, incRes] = await Promise.all([
+        fetch('/api/status'),
+        fetch('/api/risk'),
+        fetch('/api/incidents'),
+      ]);
+
+      if (statusRes.ok) updateStatusUI(await statusRes.json());
+      if (riskRes.ok) updateRisk((await riskRes.json()).risk);
+      if (incRes.ok) {
+        const d = await incRes.json();
+        allIncidents = d.incidents || [];
+        updateIncidents(allIncidents);
+        renderIncidentsTable(allIncidents);
+        renderReports(allIncidents);
+      }
+    } catch (e) {
+      console.error('Status fetch failed:', e);
+    }
+  }
+
+  function updateStatusUI(data) {
+    if ($('videoSourceText')) $('videoSourceText').textContent = data.video_source || 'test.mp4';
+    if ($('fpsVal') && data.fps !== undefined) $('fpsVal').textContent = `${data.fps} FPS`;
+    if ($('ovFps') && data.fps !== undefined) $('ovFps').textContent = `${data.fps} FPS`;
+    if ($('ovStatus')) $('ovStatus').textContent = data.status || 'MONITORING';
+    if ($('detectionCount')) $('detectionCount').textContent = data.detection_count ?? 0;
+
+    // Update detected class list in Live Monitoring sidebar
+    const clsList = $('detectedClassesList');
+    if (clsList && data.detected_classes) {
+      const entries = Object.entries(data.detected_classes);
+      if (entries.length === 0) {
+        clsList.innerHTML = '<div class="detection-pill" style="opacity:0.5;"><span>Awaiting inference…</span><span class="detection-pill-count">0</span></div>';
+      } else {
+        clsList.innerHTML = entries.map(([cls, cnt]) =>
+          `<div class="detection-pill"><span>${cls}</span><span class="detection-pill-count">${cnt}</span></div>`
+        ).join('');
+      }
+    }
+
+    const mvb = $('alertMissingVideo');
+    if (mvb) mvb.style.display = (!data.file_available && !data.use_phone_camera) ? 'flex' : 'none';
+
+    const sl = $('sourceLabel');
+    if (sl) sl.textContent = data.use_phone_camera ? '📱 Phone Camera' : 'Primary Optical Feed';
+
+    if ($('modelInfo')) {
+      const mName = data.model || 'Not loaded';
+      $('modelInfo').textContent = mName.split('/').pop().replace('.pt','');
+    }
+
+    if ($('modelClasses') && data.model_classes) {
+      const classVals = Object.values(data.model_classes);
+      $('modelClasses').textContent = classVals.length ? classVals.join(', ') : '—';
+    }
+
+    if ($('modelBadge') && data.model) {
+      $('modelBadge').textContent = data.model.split('/').pop().replace('.pt','');
+    }
+
+    const sb = $('statusBadge');
+    const pd = $('pulseDot');
+    const lit = $('liveIndicatorText');
+    if (sb && pd && lit) {
+      sb.className = 'status-badge';
+      pd.className = 'pulse-dot';
+      if (data.use_phone_camera && data.status.includes('MONITORING')) {
+        sb.classList.add('status-active'); sb.textContent = 'PHONE CAM';
+        pd.classList.add('active'); lit.textContent = 'PHONE LIVE';
+      } else if (!data.file_available && !data.use_phone_camera) {
+        sb.classList.add('status-error'); sb.textContent = 'MISSING VIDEO';
+        pd.classList.add('error'); lit.textContent = 'FILE MISSING';
+      } else if (!data.is_running) {
+        sb.classList.add('status-paused'); sb.textContent = 'STOPPED';
+        pd.classList.add('stopped'); lit.textContent = 'STOPPED';
+      } else {
+        sb.classList.add('status-active'); sb.textContent = 'MONITORING';
+        pd.classList.add('active'); lit.textContent = 'MONITORING';
+      }
+    }
+
+    if (btnEnablePhone && btnDisablePhone) {
+      btnEnablePhone.style.display = data.use_phone_camera ? 'none' : 'block';
+      btnDisablePhone.style.display = data.use_phone_camera ? 'block' : 'none';
+    }
+
+    if (btnStart && btnStop) {
+      btnStart.disabled = data.is_running;
+      btnStart.style.opacity = data.is_running ? '0.5' : '1';
+      btnStop.disabled = !data.is_running;
+      btnStop.style.opacity = !data.is_running ? '0.5' : '1';
+    }
+  }
+
+  function updateIncidents(incidents) {
+    const panel = $('incidentsPanel');
+    const ovPanel = $('ovRecentList');
+    if ($('incidentCount')) $('incidentCount').textContent = incidents.length;
+    if ($('ovIncCount')) $('ovIncCount').textContent = incidents.length;
+    if ($('ovRecBadge')) $('ovRecBadge').textContent = `${incidents.length} Events`;
+
+    if (incidents.length > lastIncidentCount) {
+      const newest = incidents[0];
+      if (newest && newest.type) {
+        const flashText = $('alertFlashText');
+        if (flashText) flashText.textContent = `🚨 INCIDENT: ${newest.type.toUpperCase()}`;
+        showAlertFlash();
+      }
+    }
+    lastIncidentCount = incidents.length;
+
+    const html = incidents.length === 0
+      ? '<div style="color:var(--text-dim); font-size:0.78rem; text-align:center; padding:12px 0;">No incidents yet</div>'
+      : incidents.slice(0, 20).map(inc => {
+          const typeClass = inc.type === 'fire' ? 'badge-fire' : inc.type === 'smoke' ? 'badge-smoke' : 'badge-critical';
+          const emoji = inc.type === 'fire' ? '🔥' : inc.type === 'smoke' ? '💨' : '⚠';
+          const conf = inc.confidence ? `${(inc.confidence * 100).toFixed(0)}%` : '';
+          const ts = inc.timestamp ? new Date(inc.timestamp).toLocaleTimeString() : '';
+          return `<div class="incident-row">
+            <span class="incident-badge ${typeClass}">${emoji} ${inc.type || 'unknown'}</span>
+            <span style="color:var(--text-muted); font-size:0.75rem;">${conf}</span>
+            <span class="incident-time">${ts}</span>
+          </div>`;
+        }).join('');
+
+    if (panel) panel.innerHTML = html;
+    if (ovPanel) ovPanel.innerHTML = html;
+  }
+
+  function renderIncidentsTable(incidents) {
+    const tbody = $('incTableBody');
+    if (!tbody) return;
+
+    const q = ($('incSearch')?.value || '').toLowerCase();
+    const sevFilter = $('incFilterSev')?.value || 'ALL';
+    const typeFilter = $('incFilterType')?.value || 'ALL';
+
+    const filtered = incidents.filter(inc => {
+      const incSev = (inc.risk_level || 'CRITICAL').toUpperCase();
+      const incType = (inc.type || '').toLowerCase();
+      if (sevFilter !== 'ALL' && incSev !== sevFilter) return false;
+      if (typeFilter !== 'ALL' && !incType.includes(typeFilter.toLowerCase())) return false;
+      if (q && !JSON.stringify(inc).toLowerCase().includes(q)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--text-dim);">No matching incidents found</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(inc => {
+      const ts = inc.timestamp ? new Date(inc.timestamp).toLocaleString() : 'N/A';
+      const type = inc.type || 'hazard';
+      const sev = inc.risk_level || 'CRITICAL';
+      const conf = inc.confidence ? `${(inc.confidence * 100).toFixed(0)}%` : 'N/A';
+      const ev = inc.evidence_path ? `<a href="/${inc.evidence_path}" target="_blank" style="color:var(--accent-blue);">View Image</a>` : 'None';
+      const alertBadge = inc.alert_sent ? '<span class="badge badge-safe">SENT</span>' : '<span class="badge badge-warning">OFFLINE</span>';
+
+      return `<tr>
+        <td>${ts}</td>
+        <td style="text-transform:capitalize;">${type}</td>
+        <td><span class="badge badge-${sev === 'CRITICAL' ? 'critical' : 'warning'}">${sev}</span></td>
+        <td>${conf}</td>
+        <td>${ev}</td>
+        <td>${alertBadge}</td>
+        <td>${inc.zone || 'Configured'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  if ($('incSearch')) $('incSearch').addEventListener('input', () => renderIncidentsTable(allIncidents));
+  if ($('incFilterSev')) $('incFilterSev').addEventListener('change', () => renderIncidentsTable(allIncidents));
+  if ($('incFilterType')) $('incFilterType').addEventListener('change', () => renderIncidentsTable(allIncidents));
+  if ($('btnExportCsv')) $('btnExportCsv').addEventListener('click', () => window.location.href = '/api/incidents/export');
+
+  function renderReports(incidents) {
+    if ($('repTotal')) $('repTotal').textContent = incidents.length;
+    const fireCount = incidents.filter(i => i.type === 'fire').length;
+    const smokeCount = incidents.filter(i => i.type === 'smoke').length;
+    if ($('repFire')) $('repFire').textContent = fireCount;
+    if ($('repSmoke')) $('repSmoke').textContent = smokeCount;
+
+    if ($('repSummaryText')) {
+      $('repSummaryText').innerHTML = `
+        <strong>Safety Audit Summary</strong>:<br>
+        Total incidents recorded: <strong>${incidents.length}</strong><br>
+        • Fire events: <strong>${fireCount}</strong><br>
+        • Smoke hazards: <strong>${smokeCount}</strong><br>
+        • Zone intrustions: <strong>${incidents.length - (fireCount + smokeCount)}</strong><br>
+        All incidents have been queued to the in-memory audit trail and logged to Supabase persistence.
+      `;
+    }
+  }
+
+  // Chatbot logic
+  async function sendChatMessage(text) {
+    const chatMsgs = $('chatMessages');
+    if (!text || !chatMsgs) return;
+
+    // Append user message
+    const userDiv = document.createElement('div');
+    userDiv.className = 'chat-bubble user';
+    userDiv.textContent = text;
+    chatMsgs.appendChild(userDiv);
+    chatMsgs.scrollTop = chatMsgs.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text })
+      });
+      const data = await res.json();
+
+      const botDiv = document.createElement('div');
+      botDiv.className = 'chat-bubble bot';
+      botDiv.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : 'I could not process that request.';
+      chatMsgs.appendChild(botDiv);
+      chatMsgs.scrollTop = chatMsgs.scrollHeight;
+    } catch (e) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'chat-bubble bot';
+      errDiv.textContent = 'Error connecting to Safety Assistant backend.';
+      chatMsgs.appendChild(errDiv);
+    }
+  }
+
+  function sendQuickChat(text) {
+    switchTab('tab-assistant');
+    sendChatMessage(text);
+  }
+
+  if ($('chatForm')) {
+    $('chatForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const input = $('chatInput');
+      if (input && input.value.trim()) {
+        sendChatMessage(input.value.trim());
+        input.value = '';
+      }
+    });
+  }
+
+  // Profile Form Persistence
+  if ($('profileForm')) {
+    $('profileForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const prof = {
+        name: $('profName').value,
+        role: $('profRole').value,
+        dept: $('profDept').value,
+        email: $('profEmail').value,
+        phone: $('profPhone').value
+      };
+      localStorage.setItem('ironeye_profile', JSON.stringify(prof));
+      alert('Profile updated successfully!');
+    });
+
+    const savedProf = JSON.parse(localStorage.getItem('ironeye_profile') || '{}');
+    if (savedProf.name) $('profName').value = savedProf.name;
+    if (savedProf.role) $('profRole').value = savedProf.role;
+    if (savedProf.dept) $('profDept').value = savedProf.dept;
+    if (savedProf.email) $('profEmail').value = savedProf.email;
+    if (savedProf.phone) $('profPhone').value = savedProf.phone;
+  }
+
+  // Settings Save Persistence
+  if ($('btnSaveSettings')) {
+    $('btnSaveSettings').addEventListener('click', () => {
+      localStorage.setItem('ironeye_settings', JSON.stringify({
+        theme: $('setTheme').value,
+        source: $('setSource').value,
+        volume: $('setVolume').value,
+        conf: $('setConf').value
+      }));
+      setTheme($('setTheme').value);
+      alert('Settings saved successfully!');
+    });
+  }
+
+  // Button actions
+  async function startMonitoring() {
+    try { await fetch('/api/start', { method: 'POST' }); fetchStatus(); reloadStream(); } catch(e) {}
+  }
+  async function stopMonitoring() {
+    try { await fetch('/api/stop', { method: 'POST' }); fetchStatus(); } catch(e) {}
+  }
+  async function enablePhoneCamera() {
+    await fetch('/api/phone_camera/enable', { method: 'POST' }); fetchStatus(); reloadStream();
+  }
+  async function disablePhoneCamera() {
+    await fetch('/api/phone_camera/disable', { method: 'POST' }); fetchStatus(); reloadStream();
+  }
+
+  if (btnStart) btnStart.addEventListener('click', startMonitoring);
+  if (btnStop) btnStop.addEventListener('click', stopMonitoring);
+  if (btnRefresh) btnRefresh.addEventListener('click', reloadStream);
+  if (btnEnablePhone) btnEnablePhone.addEventListener('click', enablePhoneCamera);
+  if (btnDisablePhone) btnDisablePhone.addEventListener('click', disablePhoneCamera);
+
+  // Safety Zone Canvas Drawing
+  function initSafetyZoneDrawing() {
+    const zoneCanvas = document.getElementById('zoneCanvas');
+    if (!zoneCanvas) return;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    let zonePoints = [];
+    let isSaved = false;
+    let lastWidth = 0, lastHeight = 0;
+
+    function updateZoneCanvasSize() {
+      const rect = zoneCanvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      if (lastWidth > 0 && lastHeight > 0 && (lastWidth !== rect.width || lastHeight !== rect.height)) {
+        const sx = rect.width / lastWidth, sy = rect.height / lastHeight;
+        zonePoints = zonePoints.map(p => ({ x: Math.round(p.x * sx), y: Math.round(p.y * sy) }));
+      }
+      lastWidth = rect.width; lastHeight = rect.height;
+      zoneCanvas.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+      drawZone();
+    }
+
+    function getSVGCoords(event) {
+      const rect = zoneCanvas.getBoundingClientRect();
+      if (zoneCanvas.getScreenCTM && zoneCanvas.createSVGPoint) {
+        const ctm = zoneCanvas.getScreenCTM();
+        if (ctm) {
+          const pt = zoneCanvas.createSVGPoint();
+          pt.x = event.clientX; pt.y = event.clientY;
+          const sp = pt.matrixTransform(ctm.inverse());
+          return { x: Math.round(sp.x), y: Math.round(sp.y) };
+        }
+      }
+      return { x: Math.round(event.clientX - rect.left), y: Math.round(event.clientY - rect.top) };
+    }
+
+    function drawZone() {
+      zoneCanvas.innerHTML = '';
+      if (zonePoints.length === 0) return;
+      const pts = zonePoints.map(p => `${p.x},${p.y}`).join(' ');
+
+      if (zonePoints.length >= 3) {
+        const poly = document.createElementNS(SVG_NS, 'polygon');
+        poly.setAttribute('points', pts);
+        poly.setAttribute('fill', isSaved ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)');
+        poly.setAttribute('stroke', isSaved ? '#10b981' : '#f59e0b');
+        poly.setAttribute('stroke-width', '2');
+        zoneCanvas.appendChild(poly);
+      } else if (zonePoints.length === 2) {
+        const pl = document.createElementNS(SVG_NS, 'polyline');
+        pl.setAttribute('points', pts);
+        pl.setAttribute('fill', 'none');
+        pl.setAttribute('stroke', '#f59e0b');
+        pl.setAttribute('stroke-width', '2');
+        zoneCanvas.appendChild(pl);
+      }
+
+      zonePoints.forEach((p, i) => {
+        const c = document.createElementNS(SVG_NS, 'circle');
+        c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); c.setAttribute('r', '5');
+        c.setAttribute('fill', isSaved ? '#10b981' : '#f59e0b');
+        c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '1.5');
+        zoneCanvas.appendChild(c);
+      });
+    }
+
+    function toggleDrawingMode(on) {
+      drawingMode = on;
+      const hint = $('zoneDrawingHint');
+      const cp = $('zoneControlsPanel');
+      btnDrawZone.textContent = on ? '⏸ Stop Drawing' : '✏ Draw Zone';
+      zoneCanvas.style.cursor = on ? 'crosshair' : '';
+      if (hint) hint.style.display = on ? 'block' : 'none';
+      if (cp) cp.style.display = on ? 'flex' : 'none';
+    }
+
+    btnDrawZone.addEventListener('click', () => {
+      if (drawingMode) toggleDrawingMode(false);
+      else { if (isSaved) { zonePoints = []; isSaved = false; drawZone(); } toggleDrawingMode(true); }
+    });
+
+    btnClearZone.addEventListener('click', async () => {
+      zonePoints = []; isSaved = false; drawZone();
+      btnClearZone.style.display = 'none';
+      if ($('zoneStatus')) $('zoneStatus').textContent = 'Not configured';
+      try { await fetch('/api/clear_zone', { method: 'DELETE' }); } catch(e) {}
+    });
+
+    zoneCanvas.addEventListener('click', e => {
+      if (!drawingMode || e.detail > 1) return;
+      if (isSaved) { zonePoints = []; isSaved = false; }
+      zonePoints.push(getSVGCoords(e));
+      drawZone();
+    });
+
+    zoneCanvas.addEventListener('dblclick', async e => {
+      if (!drawingMode) return;
+      e.preventDefault(); e.stopPropagation();
+      if (zonePoints.length < 3) { alert('A safety zone requires at least 3 points.'); return; }
+
+      try {
+        const res = await fetch('/api/set_zone', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ points: zonePoints }),
+        });
+        const result = await res.json();
+        if (res.ok && result.success) {
+          isSaved = true; drawZone(); toggleDrawingMode(false);
+          btnClearZone.style.display = 'block';
+          if ($('zoneStatus')) { $('zoneStatus').textContent = '✓ Active Zone'; $('zoneStatus').style.color = 'var(--accent-emerald)'; }
+        }
+      } catch(err) { alert('Network error saving zone: ' + err.message); }
+    });
+
+    window.addEventListener('resize', updateZoneCanvasSize);
+    if (window.ResizeObserver) new ResizeObserver(updateZoneCanvasSize).observe(zoneCanvas);
+    if (videoFeed) videoFeed.addEventListener('load', updateZoneCanvasSize);
+    updateZoneCanvasSize();
+
+    fetch('/api/get_zone').then(r => r.json()).then(data => {
+      if (data.points && data.points.length >= 3) {
+        zonePoints = data.points; isSaved = true; drawZone();
+        btnClearZone.style.display = 'block';
+        if ($('zoneStatus')) { $('zoneStatus').textContent = '✓ Active Zone'; $('zoneStatus').style.color = 'var(--accent-emerald)'; }
+        updateZoneCanvasSize();
+      }
+    }).catch(() => {});
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSafetyZoneDrawing);
+  else initSafetyZoneDrawing();
+
+  fetchStatus();
+  setInterval(fetchStatus, 1500);
+  </script>
+
 </body>
 </html>
